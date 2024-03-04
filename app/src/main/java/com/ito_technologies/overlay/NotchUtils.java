@@ -1,0 +1,183 @@
+package com.ito_technologies.overlay;
+
+import java.lang.reflect.Method;
+
+/**
+ * Created by mofei on 2018/5/11.
+ */
+
+import android.content.Context;
+import android.provider.Settings;
+import android.util.Log;
+import android.view.Window;
+import android.view.WindowManager;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+
+public class NotchUtils {
+    public static final int FLAG_NOTCH_SUPPORT_HW = 0x00010000;
+    public static final String DISPLAY_NOTCH_STATUS = "display_notch_status";
+    public static final int FLAG_NOTCH_SUPPORT_MI = 0x00000100;
+    public static final int FLAG_NOTCH_PORTRAIT_MI = 0x00000200;
+    public static final int FLAG_NOTCH_HORIZONTAL_MI = 0x00000400;
+    public static final int VIVO_NOTCH = 0x00000020;
+    public static final int VIVO_FILLET = 0x00000008;
+
+    public static boolean hasNotchAtHuawei(Context context) {
+        boolean ret = false;
+        try {
+            ClassLoader cl = context.getClassLoader();
+            Class HwNotchSizeUtil = cl.loadClass("com.huawei.android.util.HwNotchSizeUtil");
+            Method get = HwNotchSizeUtil.getMethod("hasNotchInScreen");
+            ret = (boolean) get.invoke(HwNotchSizeUtil);
+        } catch (ClassNotFoundException e) {
+            Log.e("test", "hasNotchInScreen ClassNotFoundException");
+        } catch (NoSuchMethodException e) {
+            Log.e("test", "hasNotchInScreen NoSuchMethodException");
+        } catch (Exception e) {
+            Log.e("test", "hasNotchInScreen Exception");
+        } finally {
+            return ret;
+        }
+    }
+
+    public static int[] getNotchSizeAtHuawei(Context context) {
+        int[] ret = new int[]{0, 0};
+        try {
+            ClassLoader cl = context.getClassLoader();
+            Class HwNotchSizeUtil = cl.loadClass("com.huawei.android.util.HwNotchSizeUtil");
+            Method get = HwNotchSizeUtil.getMethod("getNotchSize");
+            ret = (int[]) get.invoke(HwNotchSizeUtil);
+        } catch (ClassNotFoundException e) {
+            Log.e("test", "getNotchSize ClassNotFoundException");
+        } catch (NoSuchMethodException e) {
+            Log.e("test", "getNotchSize NoSuchMethodException");
+        } catch (Exception e) {
+            Log.e("test", "getNotchSize Exception");
+        } finally {
+            return ret;
+        }
+    }
+
+    public static void setFullScreenAtHuawei(Window window) {
+        if (window == null) {
+            return;
+        }
+        WindowManager.LayoutParams layoutParams = window.getAttributes();
+        try {
+            Class layoutParamsExCls = Class.forName("com.huawei.android.view.LayoutParamsEx");
+            Constructor con = layoutParamsExCls.getConstructor(WindowManager.LayoutParams.class);
+            Object layoutParamsExObj = con.newInstance(layoutParams);
+            Method method = layoutParamsExCls.getMethod("addHwFlags", int.class);
+            method.invoke(layoutParamsExObj, FLAG_NOTCH_SUPPORT_HW);
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InstantiationException
+                | InvocationTargetException e) {
+            Log.e("test", "hw add notch screen flag api error");
+        } catch (Exception e) {
+            Log.e("test", "other Exception");
+        }
+    }
+
+    public static void setNotFullScreenAtHuawei(Window window) {
+        if (window == null) {
+            return;
+        }
+        WindowManager.LayoutParams layoutParams = window.getAttributes();
+        try {
+            Class layoutParamsExCls = Class.forName("com.huawei.android.view.LayoutParamsEx");
+            Constructor con = layoutParamsExCls.getConstructor(WindowManager.LayoutParams.class);
+            Object layoutParamsExObj = con.newInstance(layoutParams);
+            Method method = layoutParamsExCls.getMethod("clearHwFlags", int.class);
+            method.invoke(layoutParamsExObj, FLAG_NOTCH_SUPPORT_HW);
+        } catch (ClassNotFoundException | NoSuchMethodException | IllegalAccessException | InstantiationException
+                | InvocationTargetException e) {
+            Log.e("test", "hw clear notch screen flag api error");
+        } catch (Exception e) {
+            Log.e("test", "other Exception");
+        }
+    }
+
+    public static int getIsNotchSwitchOpenAtHuawei(Context context) {
+        return Settings.Secure.getInt(context.getContentResolver(), DISPLAY_NOTCH_STATUS, 0);
+    }
+
+    public static boolean hasNotchAtXiaomi(Context context) {
+        boolean ret = false;
+        try {
+            ClassLoader cl = context.getClassLoader();
+            Class SystemProperties = cl.loadClass("android.os.SystemProperties");
+            Method get = SystemProperties.getMethod("getInt", String.class, int.class);
+            ret = (Integer) get.invoke(SystemProperties, "ro.miui.notch", 0) == 1;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            return ret;
+        }
+    }
+
+    public static int getNotHeightAtXiaomi(Context context) {
+        int result = 0;
+        int resourceId = context.getResources().getIdentifier("notch_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = context.getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
+    }
+
+    public static int getNotWidthAtXiaomi(Context context) {
+        int result = 0;
+        int resourceId = context.getResources().getIdentifier("notch_width", "dimen", "android");
+        if (resourceId > 0) {
+            result = context.getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
+    }
+
+    public static void setFullScreenAtXiaomi(Window window) {
+        // 竖屏绘制到耳朵区
+        int flag = FLAG_NOTCH_SUPPORT_MI | FLAG_NOTCH_PORTRAIT_MI;
+        try {
+            Method method = Window.class.getMethod("addExtraFlags",
+                    int.class);
+            method.invoke(window, flag);
+        } catch (Exception e) {
+            Log.e("test", "addExtraFlags not found.");
+        }
+    }
+
+    public static boolean getIsNotchHideOpenAtXiaomi(Context context) {
+        return Settings.Global.getInt(context.getContentResolver(), "force_black", 0) == 1;
+    }
+
+    public static boolean hasNotchAtVivo(Context context) {
+        boolean ret = false;
+        try {
+            ClassLoader classLoader = context.getClassLoader();
+            Class FtFeature = classLoader.loadClass("android.util.FtFeature");
+            Method method = FtFeature.getMethod("isFeatureSupport", int.class);
+            ret = (boolean) method.invoke(FtFeature, VIVO_NOTCH);
+        } catch (ClassNotFoundException e) {
+            Log.e("Notch", "hasNotchAtVivo ClassNotFoundException");
+        } catch (NoSuchMethodException e) {
+            Log.e("Notch", "hasNotchAtVivo NoSuchMethodException");
+        } catch (Exception e) {
+            Log.e("Notch", "hasNotchAtVivo Exception");
+        } finally {
+            return ret;
+        }
+    }
+
+    public static boolean hasNotchAtOppo(Context context) {
+        return context.getPackageManager().hasSystemFeature("com.oppo.feature.screen.heteromorphism");
+    }
+
+    public static int getStatusBarHeight(Context context) {
+        int statusBarHeight = 0;
+        int resourceId = context.getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            statusBarHeight = context.getResources().getDimensionPixelSize(resourceId);
+        }
+        return statusBarHeight;
+    }
+}
